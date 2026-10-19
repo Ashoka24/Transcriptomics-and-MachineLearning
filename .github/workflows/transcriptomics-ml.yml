@@ -1,0 +1,48 @@
+name: Transcriptomics ML analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "metadata/**"
+      - "README.md"
+      - ".github/workflows/transcriptomics-ml.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy pandas scikit-learn matplotlib
+      - name: Download GEO processed matrix
+        run: |
+          mkdir -p data
+          curl -fL --retry 3 "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE42nnn/GSE42568/matrix/GSE42568_series_matrix.txt.gz" -o data/GSE42568_series_matrix.txt.gz
+          gzip -t data/GSE42568_series_matrix.txt.gz
+      - name: Run analysis
+        run: python scripts/run_ml.py
+      - name: Check outputs
+        run: |
+          test -s results/REPORT.md
+          test -s results/metrics.tsv
+          test -s results/feature_ranking.tsv
+          test -s results/figures/model_performance.svg
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcriptomics-ml-results
+          path: results/
+          if-no-files-found: error
+          retention-days: 90
